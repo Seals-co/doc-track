@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from tree_sitter import Parser
 
 import tree_sitter_python as tspython
+import subprocess
+import re
 from tree_sitter import Language, Parser, Node, Point
 
 PY_LANGUAGE = Language(tspython.language())
@@ -16,8 +18,8 @@ class CodeNode:
     to_line: int = 0
 
 
-@dataclass
-class Difference(frozen=True):
+@dataclass(frozen=True)
+class Difference:
     from_line: int = 0
     to_line: int = 0
 
@@ -111,11 +113,47 @@ def get_structure_code_nodes(file_content: str, target_line: int, language: str)
 
     return contexts[::-1]
 
-def get_differences() -> dict[str, Difference]:
+def parse_differences(output: str) -> dict[str, list[Difference]]:
     """
-    returns list of differenteces
+    Parse `git diff` output to
+    return a dict mapping each changed file to a list of Difference objects,
     """
-    ...
+    differences = {}
+    current_file = None
+
+    for line in output.splitlines():
+        if line.startswith('diff --git'):
+            current_file = None  # Reset on new diff block
+        elif line.startswith('+++ b/'):
+            current_file = line[6:]
+            differences.setdefault(current_file, [])
+        elif line.startswith('@@'):
+            match = re.match(r'^@@ -(\d+),?\d* \+(\d+),?', line)
+            if match and current_file:
+                import pdb; pdb.set_trace()
+                from_line = int(match.group(1))
+                to_line = int(match.group(2))
+                differences[current_file].append(Difference(from_line=from_line, to_line=to_line))
+
+    return differences
+
+def get_differences() -> dict[str, list[Difference]]:
+    """
+    Returns a dict mapping each changed file to a list of Difference objects,
+    each representing a hunk of differences as reported by `git diff`.
+    """
+
+    differences = {}
+
+    result = subprocess.run(['git', 'diff', '--unified=0'], capture_output=True, text=True)
+    ouput = result.stdout
+    differences.update(ouput)
+
+    result = subprocess.run(['git', 'diff', '--cached', '--unified=0'], capture_output=True, text=True)
+    ouput = result.stdout
+    differences.update(ouput)
+
+    return differences
 
 def get_last_comment_line_before_index(lines: list[str], ind: int, language: str = "python"):
     i = ind - 1
