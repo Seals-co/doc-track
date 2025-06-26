@@ -17,12 +17,9 @@ class CodeNode:
 
 
 @dataclass
-class Difference:
+class Difference(frozen=True):
     from_line: int = 0
     to_line: int = 0
-
-    def __hash__(self):
-        return int(f"{self.from_line}{self.to_line}")
 
 def find_first_comment(node: Node):
     if node.type == 'comment':
