@@ -198,28 +198,33 @@ def get_last_comment_line_before_index(lines: list[str], ind: int, language: str
         i -= 1
     return i + 1
 
-def content_difference_is_tagged(content: str, difference: Difference, tags: list[str]):
+def content_difference_is_tagged(
+    content: str,
+    difference: Difference,
+    tags: list[str],
+    language: str = "python",
+):
     lines = content.splitlines()
 
-    line_before_index = get_last_comment_line_before_index(lines, difference.from_line)
+    line_before_index = get_last_comment_line_before_index(lines, difference.from_line, language)
     for i in range(line_before_index, difference.from_line):
-        if line_is_tag(lines[i], tags):
+        if line_is_tag(lines[i], tags, language):
             return True
 
     # Check if one of the added / removed lines contains doc
     for i in range(difference.from_line, difference.to_line + 1):
-        if line_is_tagged(lines[i], tags):
+        if line_is_tagged(lines[i], tags, language):
             return True
 
-    code_nodes = get_structure_code_nodes(content, difference.from_line, "python")
+    code_nodes = get_structure_code_nodes(content, difference.from_line, language)
     for code_node in code_nodes:
         line_before_index = get_last_comment_line_before_index(lines, code_node.from_line)
         for i in range(line_before_index, code_node.from_line):
-            if line_is_tag(lines[i], tags):
+            if line_is_tag(lines[i], tags, language):
                 return True
 
         for i in range(code_node.from_line, code_node.to_line + 1):
-            if line_is_tagged(lines[i], tags):
+            if line_is_tagged(lines[i], tags, language):
                 return True
 
     return False
@@ -254,7 +259,8 @@ def get_doc_tracked_differences(
     version1: str | None,
     version2: str | None,
     path: str | None,
-    tags: list[str]
+    tags: list[str],
+    language: str = "python",
 ) -> dict[str, GitDifference]:
     result = {}
     git_differences = get_git_differences(version1, version2, path)
