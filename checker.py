@@ -224,6 +224,32 @@ def content_difference_is_tagged(content: str, difference: Difference, tags: lis
 
     return False
 
+def get_file_content(version: str | None, path: str):
+    result = ""
+
+    if version:
+        show_result = subprocess.run(
+            ["git", "show", f"{version}:{path}"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            text=True
+        )
+
+        result = show_result.stdout
+    else:
+        cat_result = subprocess.run(
+            ["cat", f"{path}"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            text=True
+        )
+
+        result = cat_result.stdout
+
+    return result
+
 def get_doc_tracked_differences(
     version1: str | None,
     version2: str | None,
@@ -238,34 +264,19 @@ def get_doc_tracked_differences(
     version1 = version1 or ""
     version2 = version2 or ""
     for file_path, git_differences in git_differences.items():
-        show_result_version_1 = subprocess.run(
-            ["git", "show", f"{version1}:{file_path}"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-            text=True
-        )
-        show_result_version_2 = subprocess.run(
-            ["git", "show", f"{version2}:{file_path}"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-            text=True
-        )
-        content_version_1 = show_result_version_1.stdout
-        content_version_2 = show_result_version_2.stdout
+        content_version_1 = get_file_content(version1, file_path)
+        content_version_2 = get_file_content(version2, file_path)
 
         for git_difference in git_differences:
             difference = Difference(from_line=git_difference.from_rm_line, to_line=git_difference.to_rm_line)
-            if content_difference_is_tagged(content_version_1, difference, tags):
-                result[file_path] = set([*result.get(file_path, set([])), git_difference])
-                continue
+            if difference.from_line != -1:
+                if content_difference_is_tagged(content_version_1, difference, tags):
+                    result[file_path] = set([*result.get(file_path, set([])), git_difference])
+                    continue
 
             difference = Difference(from_line=git_difference.from_add_line, to_line=git_difference.to_add_line)
-            if content_difference_is_tagged(content_version_2, difference, tags):
-                result[file_path] = set([*result.get(file_path, set([])), git_difference])
+            if difference.from_line != -1:
+                if content_difference_is_tagged(content_version_2, difference, tags):
+                    result[file_path] = set([*result.get(file_path, set([])), git_difference])
 
     return result
-
-def run():
-    return 22
