@@ -8,6 +8,9 @@ doc-track is a tool that allows developpers to make CI fail or add message to co
 
 --fail-status       # to set $? to the specified value when fail
 
+# args list:
+
+[<commit>]...[<commit>] [--] [<path>...]
 
 # tagging a line
-tagging a line to flag it has documented add a comment in the same line wit flag word
+tagging a line to flag it has documented comment in the same line with flag word

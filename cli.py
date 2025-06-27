@@ -10,7 +10,7 @@ COMMANDS = {
 }
 
 def cli_args():
-    parser = argparse.ArgumentParser(prog="doced")
+    parser = argparse.ArgumentParser(prog="doc-track")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 

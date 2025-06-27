@@ -19,9 +19,16 @@ class CodeNode:
 
 
 @dataclass(frozen=True)
+class GitDifference:
+    from_rm_line: int = -1
+    to_rm_line: int = -1
+    from_add_line: int = -1
+    to_add_line: int = -1
+
+@dataclass(frozen=True)
 class Difference:
-    from_line: int = 0
-    to_line: int = 0
+    from_line: int = -1
+    to_line: int = -1
 
 def find_first_comment(node: Node):
     if node.type == 'comment':
@@ -113,10 +120,39 @@ def get_structure_code_nodes(file_content: str, target_line: int, language: str)
 
     return contexts[::-1]
 
-def parse_differences(output: str) -> dict[str, list[Difference]]:
+def get_git_difference(
+    rm_start: int,
+    rm_len: int,
+    add_start: int,
+    add_len: int,
+) -> GitDifference:
+    if add_len:
+        from_add_line = add_start - 1
+        to_add_line = from_add_line + add_len - 1
+    else:
+        from_add_line = -1
+        to_add_line = -1
+
+    if rm_len:
+        from_rm_line = rm_start - 1
+        to_rm_line = from_rm_line + rm_len - 1
+    else:
+        from_rm_line = -1
+        to_rm_line = -1
+
+
+    return GitDifference(
+        from_add_line=from_add_line,
+        to_add_line=to_add_line,
+        from_rm_line=from_rm_line,
+        to_rm_line=to_rm_line,
+    )
+
+
+def parse_differences(output: str) -> dict[str, list[GitDifference]]:
     """
     Parse `git diff` output to
-    return a dict mapping each changed file to a list of Difference objects,
+    return a dict mapping each changed file to a list of GitDifference objects,
     """
     differences = {}
     current_file = None
@@ -128,32 +164,33 @@ def parse_differences(output: str) -> dict[str, list[Difference]]:
             current_file = line[6:]
             differences.setdefault(current_file, [])
         elif line.startswith('@@'):
-            match = re.match(r'^@@ -(\d+),?\d* \+(\d+),?', line)
+            match = re.match(r'^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))?', line)
             if match and current_file:
-                import pdb; pdb.set_trace()
-                from_line = int(match.group(1))
-                to_line = int(match.group(2))
-                differences[current_file].append(Difference(from_line=from_line, to_line=to_line))
+                rm_start = int(match.group(1))
+                rm_len = int(match.group(2) or 1)
+                add_start = int(match.group(3))
+                add_len = int(match.group(4) or 1)
+
+                difference = get_git_difference(rm_start, rm_len, add_start, add_len)
+                differences[current_file].append(difference)
 
     return differences
 
-def get_differences() -> dict[str, list[Difference]]:
+def get_git_differences(
+    version1: str | None,
+    version2: str | None,
+    path: str | None,
+) -> dict[str, list[GitDifference]]:
     """
-    Returns a dict mapping each changed file to a list of Difference objects,
+    Returns a dict mapping each changed file to a list of GitDifference objects,
     each representing a hunk of differences as reported by `git diff`.
     """
 
-    differences = {}
+    args = [a for a in (version1, version2, "--", path) if a]
 
-    result = subprocess.run(['git', 'diff', '--unified=0'], capture_output=True, text=True)
-    ouput = result.stdout
-    differences.update(ouput)
-
-    result = subprocess.run(['git', 'diff', '--cached', '--unified=0'], capture_output=True, text=True)
-    ouput = result.stdout
-    differences.update(ouput)
-
-    return differences
+    result = subprocess.run(['git', 'diff', '--unified=0', *args], capture_output=True, text=True)
+    output = result.stdout
+    return parse_differences(output)
 
 def get_last_comment_line_before_index(lines: list[str], ind: int, language: str = "python"):
     i = ind - 1
@@ -161,52 +198,74 @@ def get_last_comment_line_before_index(lines: list[str], ind: int, language: str
         i -= 1
     return i + 1
 
-def get_doc_tracked_differences(tags: list[str]) -> dict[str, Difference]:
+def content_difference_is_tagged(content: str, difference: Difference, tags: list[str]):
+    lines = content.splitlines()
+
+    line_before_index = get_last_comment_line_before_index(lines, difference.from_line)
+    for i in range(line_before_index, difference.from_line):
+        if line_is_tag(lines[i], tags):
+            return True
+
+    # Check if one of the added / removed lines contains doc
+    for i in range(difference.from_line, difference.to_line + 1):
+        if line_is_tagged(lines[i], tags):
+            return True
+
+    code_nodes = get_structure_code_nodes(content, difference.from_line, "python")
+    for code_node in code_nodes:
+        line_before_index = get_last_comment_line_before_index(lines, code_node.from_line)
+        for i in range(line_before_index, code_node.from_line):
+            if line_is_tag(lines[i], tags):
+                return True
+
+        for i in range(code_node.from_line, code_node.to_line + 1):
+            if line_is_tagged(lines[i], tags):
+                return True
+
+    return False
+
+def get_doc_tracked_differences(
+    version1: str | None,
+    version2: str | None,
+    path: str | None,
+    tags: list[str]
+) -> dict[str, GitDifference]:
     result = {}
-    differences = get_differences()
-    # Retrieve if one of the line contained in differences ends with doc-tag
+    git_differences = get_git_differences(version1, version2, path)
+    # Retrieve if one of the line contained in git_differences ends with doc-tag
     # or is precedeed by a line that contains doc-tag
 
-    for file_path, differences in differences.items():
-        file = open(file_path, "r")
-        lines = file.readlines()
-        content = "".join(lines)
-        for difference in differences:
-            add = False
-            line_before_index = get_last_comment_line_before_index(lines, difference.from_line)
-            for i in range(line_before_index, difference.from_line):
-                if line_is_tag(lines[i], tags):
-                    add = True
-                    break
-            if not add:
-                # Check if one of the added / removed lines contains doc
-                for i in range(difference.from_line, difference.to_line + 1):
-                    if line_is_tagged(lines[i], tags):
-                        add = True
-                        break
-            if add:
-                result[file_path] = set([*result.get(file_path, set([])), difference])
+    version1 = version1 or ""
+    version2 = version2 or ""
+    for file_path, git_differences in git_differences.items():
+        show_result_version_1 = subprocess.run(
+            ["git", "show", f"{version1}:{file_path}"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            text=True
+        )
+        show_result_version_2 = subprocess.run(
+            ["git", "show", f"{version2}:{file_path}"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            text=True
+        )
+        content_version_1 = show_result_version_1.stdout
+        content_version_2 = show_result_version_2.stdout
 
-        for difference in differences:
-            add = False
-            code_nodes = get_structure_code_nodes(content, difference.from_line, "python")
-            for code_node in code_nodes:
-                add = False
-                line_before_index = get_last_comment_line_before_index(lines, code_node.from_line)
-                for i in range(line_before_index, code_node.from_line):
-                    if line_is_tag(lines[i], tags):
-                        add = True
-                        break
-                if not add:
-                    for i in range(code_node.from_line, code_node.to_line + 1):
-                        if line_is_tagged(lines[i], tags):
-                            add = True
-                            break
-                if add:
-                    result[file_path] = set([*result.get(file_path, set([])), difference])
+        for git_difference in git_differences:
+            difference = Difference(from_line=git_difference.from_rm_line, to_line=git_difference.to_rm_line)
+            if content_difference_is_tagged(content_version_1, difference, tags):
+                result[file_path] = set([*result.get(file_path, set([])), git_difference])
+                continue
+
+            difference = Difference(from_line=git_difference.from_add_line, to_line=git_difference.to_add_line)
+            if content_difference_is_tagged(content_version_2, difference, tags):
+                result[file_path] = set([*result.get(file_path, set([])), git_difference])
 
     return result
-
 
 def run():
     return 22

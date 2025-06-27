@@ -1,19 +1,28 @@
+from collections import namedtuple
 import checker
 from checker import (
     PY_LANGUAGE,
     CodeNode,
     Difference,
+    GitDifference,
     find_first_comment,
-    get_doc_tracked_differences,
-    get_last_comment_line_before_index,
-    get_structure_code_nodes,
     line_is_comment,
     line_is_tag,
     line_is_tagged,
-    retrieve_end_point
+    retrieve_end_point,
+    get_structure_code_nodes,
+    get_git_difference,
+    parse_differences,
+    get_git_differences,
+    get_last_comment_line_before_index,
+    content_difference_is_tagged,
+    get_doc_tracked_differences,
+
+
 )
 import io
 import builtins
+import subprocess
 import pytest
 from tree_sitter import Parser
 
@@ -205,25 +214,15 @@ print(3)
     assert res == []
 
 
-class TestGetDocTrackedDifferences:
-    differences_data = {
-        "file1.py": [
-            Difference(0, 2),
-            Difference(5, 6),
-            Difference(9, 9),
-            Difference(14, 14),
-        ]
-    }
-
-    file1_content = io.StringIO(
-"""\
+class TestContentDifferenceIsTagged:
+    file_content = """\
 print(22) # new line but not tagged
 print(23) # new line but not tagged
 print(24) # new line but not tagged
 print(25) # old line but not tagged
 # test
-def fct(): # new line tagged with abod tag
-    return 22 # new line tagged with abod tag
+def fct(): # new line tagged with above tag
+    return 22 # new line tagged with above tag
 
 def fct(): # old line tagged # test
     return 22
@@ -233,27 +232,202 @@ class Test:
         def fct():
             return 22 # line updated
 """
-    )
+
+
+    def test_not_tagged(self):
+        assert not content_difference_is_tagged(self.file_content, Difference(0, 2), ["# test", "#test"])
+
+    def test_tagged(self):
+        assert content_difference_is_tagged(self.file_content, Difference(5, 6), ["# test", "#test"])
+
+    def test_tagged_with_above_comment(self):
+        assert content_difference_is_tagged(self.file_content, Difference(9, 9), ["# test", "#test"])
+
+    def test_tagged_with_parents(self):
+        assert content_difference_is_tagged(self.file_content, Difference(14, 14), ["# test", "#test"])
+
+
+class TestGetDifference:
+    def test_get_git_difference(self):
+        assert get_git_difference(10, 2, 10, 3) == GitDifference(from_rm_line=9, to_rm_line=10, from_add_line=9, to_add_line=11)
+
+    def test_get_git_difference_new_content(self):
+        assert get_git_difference(0, 0, 1, 3) == GitDifference(from_rm_line=-1, to_rm_line=-1, from_add_line=0, to_add_line=2)
+
+    def test_get_git_difference_no_rm(self):
+        assert get_git_difference(5, 0, 6, 2) == GitDifference(from_rm_line=-1, to_rm_line=-1, from_add_line=5, to_add_line=6)
+
+    def test_get_git_difference_no_add(self):
+        assert get_git_difference(25, 1, 27, 0) == GitDifference(from_rm_line=24, to_rm_line=24, from_add_line=-1, to_add_line=-1)
+
+
+class TestParseDifferences:
+
+    def test_parse_differences(self):
+        output = """\
+diff --git a/foo.py b/foo.py
+index e69de29..b123abc 100644
+--- a/foo.py
++++ b/foo.py
+@@ -0,0 +1,3 @@
++def hello():
++    print("Hello, world!")
++
+
+diff --git a/bar.py b/bar.py
+index aabbcc1..ddeeff2 100644
+--- a/bar.py
++++ b/bar.py
+@@ -10,2 +10,3 @@ def do_something():
+-    x = 1
+-    y = 2
++    x = 42
++    y = 99
++    z = x + y
+
+@@ -25 +27,0 @@ def remove_me():
+-    print("This will be removed")
+
+@@ -42,0 +43,2 @@ def do_something():
++    x = 42
++    y = 99
+
+
+diff --git a/baz.py b/baz.py
+index 1234567..89abcde 100644
+--- a/baz.py
++++ b/baz.py
+@@ -3 +3,2 @@ def unchanged():
+-    pass
++    print("Was empty")
++    return True
+"""
+        res = parse_differences(output)
+
+        assert res == {
+            'foo.py': [
+                GitDifference(from_rm_line=-1, to_rm_line=-1, from_add_line=0, to_add_line=2),
+            ],
+            'bar.py': [
+                GitDifference(from_rm_line=9, to_rm_line=10, from_add_line=9, to_add_line=11),
+                GitDifference(from_rm_line=24, to_rm_line=24, from_add_line=-1, to_add_line=-1),
+                GitDifference(from_rm_line=-1, to_rm_line=-1, from_add_line=42, to_add_line=43),
+            ],
+            'baz.py': [
+                GitDifference(from_rm_line=2, to_rm_line=2, from_add_line=2, to_add_line=3),
+            ],
+        }
+
+
+class TestGetDocTrackedDifferences:
+    diff_content = """\
+diff --git a/bar.py b/bar.py
+index f0c897e..ee730b2 100644
+--- a/bar.py
++++ b/bar.py
+@@ -2,2 +2,3 @@ def do_something(): # test
+-    x = 1
+-    y = 2
++    x = 42
++    y = 99
++    z = x + y
+@@ -7 +7,0 @@ def remove_me():
+-    print("This will be removed")
+@@ -13 +12,0 @@ def remove_me():
+-    print("This will be removed")
+@@ -20,0 +20,2 @@ class Test:
++                self.x2 = 42
++                self.y = 99
+"""
+
+    file_content_version1 = """\
+def do_something(): # test
+    x = 1
+    y = 2
+
+def remove_me():
+    # test
+    print("This will be removed")
+    print("This will not be removed")
+
+def remove_me():
+    # test
+    print("This will not be removed")
+    print("This will be removed")
+
+# test
+class Test:
+    class Test2:
+        def fct(self):
+            def do_something2(self):
+                self.x = 1
+"""
+
+    file_content_version2 = """\
+def do_something(): # test
+    x = 42
+    y = 99
+    z = x + y
+
+def remove_me():
+    # test
+    print("This will not be removed")
+
+def remove_me():
+    # test
+    print("This will not be removed")
+
+# test
+class Test:
+    class Test2:
+        def fct(self):
+            def do_something2(self):
+                self.x = 1
+                self.x2 = 42
+                self.y = 99
+"""
+
+    mock_results = []
+    call_counter = {}
+    fct_called = ""
+
+    MockCompletedProcess = namedtuple("CompletedProcess", ["stdout", "stderr"])
+
+    def git_show_mock(self):
+        self.call_counter.setdefault(self.fct_called, 0)
+
+        res = self.MockCompletedProcess(stdout=self.mock_results[self.call_counter[self.fct_called]], stderr="")
+        self.call_counter[self.fct_called] += 1
+        return res
 
     def test_no_differences(self, monkeypatch):
-        monkeypatch.setattr(checker, "get_differences", lambda: {})
+        self.fct_called = "test_no_differences"
+        monkeypatch.setattr(checker, "get_git_differences", lambda version1, version2, path: {})
 
-        res = get_doc_tracked_differences(["# test", "#test"])
+        res = get_doc_tracked_differences(None, None, None, ["# test", "#test"])
 
         assert res == {}
 
     def test_some_differences(self, monkeypatch):
-        monkeypatch.setattr(builtins, "open", lambda path, mode='r': self.file1_content)
-        monkeypatch.setattr(checker, "get_differences", lambda: self.differences_data)
+        """
+        going to return 3 differences because they are in a tagged scope
+        but not the difference of -13 +12,0 because it's not tagged
+        """
+        self.fct_called = "test_some_differences"
 
+        self.mock_results = [
+            self.diff_content,
+            self.file_content_version1,
+            self.file_content_version2,
+        ]
+        monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: self.git_show_mock())
 
-        res = get_doc_tracked_differences(["# test", "#test"])
+        res = get_doc_tracked_differences(None, None, None, ["# test", "#test"])
 
         assert res == {
-            "file1.py":
-                {
-                    Difference(from_line=5, to_line=6),
-                    Difference(from_line=9, to_line=9),
-                    Difference(from_line=14, to_line=14),
-                }
+            "bar.py": set([
+                GitDifference(from_rm_line=1, to_rm_line=2, from_add_line=1, to_add_line=3),
+                GitDifference(from_rm_line=6, to_rm_line=6, from_add_line=-1, to_add_line=-1),
+                GitDifference(from_rm_line=-1, to_rm_line=-1, from_add_line=19, to_add_line=20),
+            ])
         }
