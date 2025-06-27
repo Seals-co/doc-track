@@ -1,251 +1,15 @@
 from collections import namedtuple
 import checker
 from checker import (
-    PY_LANGUAGE,
-    CodeNode,
-    Difference,
     GitDifference,
-    find_first_comment,
-    line_is_comment,
-    line_is_tag,
-    line_is_tagged,
-    retrieve_end_point,
-    get_structure_code_nodes,
     get_git_difference,
     parse_differences,
-    get_git_differences,
-    get_last_comment_line_before_index,
-    content_difference_is_tagged,
     get_doc_tracked_differences,
 
 
 )
-import io
-import builtins
+
 import subprocess
-import pytest
-from tree_sitter import Parser
-
-LANGUAGE = "python"
-
-@pytest.mark.parametrize("line, expected", [
-    ("# comment", True),
-    ("#       comment", True),
-    ("#comment", True),
-    ("print(22)", False),
-    ("print(22) # comment", False),
-    ("", False),
-])
-def test_line_is_comment(line, expected):
-    assert line_is_comment(line, LANGUAGE) == expected
-
-
-@pytest.mark.parametrize("line, tags, expected", [
-    ("# comment", ["# comment"], True),             # Simple one comment line
-    ("#       comment", ["# comment"], False),      # Simple line not having specific tag
-    ("# comment 2 # comment", ["# comment"], True), # Two comments with one that is the good tag
-    ("print(22) # comment", ["# comment"], False),  # Tag on line of code but its not a tag on its own
-    ("", ["# comment"], False),                     # Empty line
-])
-def test_line_is_tag(line, tags, expected):
-    assert line_is_tag(line, tags, LANGUAGE) == expected
-
-
-@pytest.mark.parametrize("line, tags, expected", [
-    ("# comment", ["# comment"], True),             # Simple one comment line
-    ("#       comment", ["# comment"], False),      # Simple line not having specific tag
-    ("# comment 2 # comment", ["# comment"], True), # Two comments with one that is the good tag
-    ("print(22) # comment", ["# comment"], True),   # Tag on line of code
-    ("", ["# comment"], False),                     # Empty line
-])
-def test_line_is_tagged(line, tags, expected):
-    assert line_is_tagged(line, tags, LANGUAGE) == expected
-
-
-@pytest.mark.parametrize("line, is_none, text", [
-    ("# comment", False, b"# comment"),                         # Simple one comment line
-    ("print(22)", True, b""),                                   # No comment on line
-    ("def fct(): # comment", False, b"# comment"),              # Comment on line with code
-    ("# comment # comment 2", False, b"# comment # comment 2"), # 2 comments
-    ("str = '# comment'", True, b""),                           # String containing comment
-])
-def test_find_first_comment(line, is_none, text):
-    parser = Parser(PY_LANGUAGE)
-    tree = parser.parse(bytes(line, 'utf8'))
-    root = tree.root_node
-    res = find_first_comment(root)
-    if is_none:
-        assert res is None
-    else:
-        assert res is not None
-        assert res.type == "comment"
-        assert res.text == text
-
-@pytest.mark.parametrize("lines, index, res", [
-    ([
-        "print(22)\n",
-        "# comment\n",
-        "# comment2\n",
-        "\n",
-        "\n",
-        "print(23)\n",
-    ], 5, 1),
-    ([
-        "print(22)\n",
-        "# comment\n",
-        "print(23)",
-    ], 2, 1),
-    ([
-        "print(22) # comment\n",
-        "# comment\n",
-        "print(23)",
-    ], 2, 1),
-])
-def test_get_last_comment_line_before_index(lines, index, res):
-    assert get_last_comment_line_before_index(lines, index, LANGUAGE) == res
-
-
-@pytest.mark.parametrize("content, is_none, result", [
-    (
-"""def fct():
-    print(22)
-""", False, (0, 10)
-    ),
-    (
-"""class Class():
-    nb = 22
-""", False, (0, 14)
-    ),
-    ("print(22)", True, (0, 10)),
-])
-def test_retrieve_end_point(content, is_none, result):
-    parser = Parser(PY_LANGUAGE)
-    tree = parser.parse(bytes(content, 'utf8'))
-    root = tree.root_node
-    res = retrieve_end_point(root.children[0], LANGUAGE)
-    if is_none:
-        assert res is None
-    else:
-        assert res is not None
-        assert res[0] == result[0]
-        assert res[1] == result[1]
-
-
-def test_get_structure_code_nodes():
-    file_content = \
-"""\
-class Test:
-    class A:
-        def test(
-            lol
-        ): # yes
-            def haha(jj): # doc-track
-                print(22)
-            print(3)
-        print(3)
-    print(3)
-print(3)
-"""
-
-    res = get_structure_code_nodes(file_content, 0, LANGUAGE)
-    assert res == [
-        CodeNode(type="class_definition", name="Test", from_line=0, to_line=0),
-    ]
-
-    res = get_structure_code_nodes(file_content, 1, LANGUAGE)
-    assert res == [
-        CodeNode(type="class_definition", name="Test", from_line=0, to_line=0),
-    ]
-
-    res = get_structure_code_nodes(file_content, 2, LANGUAGE)
-    assert res == [
-        CodeNode(type="class_definition", name="Test", from_line=0, to_line=0),
-        CodeNode(type="class_definition", name="A", from_line=1, to_line=1),
-    ]
-
-    res = get_structure_code_nodes(file_content, 3, LANGUAGE)
-    assert res == [
-        CodeNode(type="class_definition", name="Test", from_line=0, to_line=0),
-        CodeNode(type="class_definition", name="A", from_line=1, to_line=1),
-        CodeNode(type="function_definition", name="test", from_line=2, to_line=4),
-    ]
-
-    res = get_structure_code_nodes(file_content, 4, LANGUAGE)
-    assert res == [
-        CodeNode(type="class_definition", name="Test", from_line=0, to_line=0),
-        CodeNode(type="class_definition", name="A", from_line=1, to_line=1),
-        CodeNode(type="function_definition", name="test", from_line=2, to_line=4),
-    ]
-
-    res = get_structure_code_nodes(file_content, 5, LANGUAGE)
-    assert res == [
-        CodeNode(type="class_definition", name="Test", from_line=0, to_line=0),
-        CodeNode(type="class_definition", name="A", from_line=1, to_line=1),
-        CodeNode(type="function_definition", name="test", from_line=2, to_line=4),
-    ]
-
-    res = get_structure_code_nodes(file_content, 6, LANGUAGE)
-    assert res == [
-        CodeNode(type="class_definition", name="Test", from_line=0, to_line=0),
-        CodeNode(type="class_definition", name="A", from_line=1, to_line=1),
-        CodeNode(type="function_definition", name="test", from_line=2, to_line=4),
-        CodeNode(type="function_definition", name="haha", from_line=5, to_line=5),
-    ]
-
-    res = get_structure_code_nodes(file_content, 7, LANGUAGE)
-    assert res == [
-        CodeNode(type="class_definition", name="Test", from_line=0, to_line=0),
-        CodeNode(type="class_definition", name="A", from_line=1, to_line=1),
-        CodeNode(type="function_definition", name="test", from_line=2, to_line=4),
-    ]
-
-    res = get_structure_code_nodes(file_content, 8, LANGUAGE)
-    assert res == [
-        CodeNode(type="class_definition", name="Test", from_line=0, to_line=0),
-        CodeNode(type="class_definition", name="A", from_line=1, to_line=1),
-    ]
-
-    res = get_structure_code_nodes(file_content, 9, LANGUAGE)
-    assert res == [
-        CodeNode(type="class_definition", name="Test", from_line=0, to_line=0),
-    ]
-
-    res = get_structure_code_nodes(file_content, 10, LANGUAGE)
-    assert res == []
-
-
-class TestContentDifferenceIsTagged:
-    file_content = """\
-print(22) # new line but not tagged
-print(23) # new line but not tagged
-print(24) # new line but not tagged
-print(25) # old line but not tagged
-# test
-def fct(): # new line tagged with above tag
-    return 22 # new line tagged with above tag
-
-def fct(): # old line tagged # test
-    return 22
-
-class Test:
-    class SubTest: # old line with tag # test
-        def fct():
-            return 22 # line updated
-"""
-
-
-    def test_not_tagged(self):
-        assert not content_difference_is_tagged(self.file_content, Difference(0, 2), ["# test", "#test"])
-
-    def test_tagged(self):
-        assert content_difference_is_tagged(self.file_content, Difference(5, 6), ["# test", "#test"])
-
-    def test_tagged_with_above_comment(self):
-        assert content_difference_is_tagged(self.file_content, Difference(9, 9), ["# test", "#test"])
-
-    def test_tagged_with_parents(self):
-        assert content_difference_is_tagged(self.file_content, Difference(14, 14), ["# test", "#test"])
-
 
 class TestGetDifference:
     def test_get_git_difference(self):
@@ -322,37 +86,43 @@ index 1234567..89abcde 100644
 class TestGetDocTrackedDifferences:
     diff_content = """\
 diff --git a/bar.py b/bar.py
-index f0c897e..ee730b2 100644
+index 225fd2e..d65e857 100644
 --- a/bar.py
 +++ b/bar.py
-@@ -2,2 +2,3 @@ def do_something(): # test
+@@ -3,2 +3,3 @@ def do_something():
 -    x = 1
 -    y = 2
 +    x = 42
 +    y = 99
 +    z = x + y
-@@ -7 +7,0 @@ def remove_me():
+@@ -8,3 +8,0 @@ def remove_me():
+-    # test
 -    print("This will be removed")
-@@ -13 +12,0 @@ def remove_me():
+-    # endtest
+@@ -17 +14,0 @@ def remove_me():
 -    print("This will be removed")
-@@ -20,0 +20,2 @@ class Test:
+@@ -24,0 +22,2 @@ class Test:
 +                self.x2 = 42
 +                self.y = 99
 """
 
     file_content_version1 = """\
-def do_something(): # test
+# test
+def do_something():
     x = 1
     y = 2
+# endtest
 
 def remove_me():
     # test
     print("This will be removed")
+    # endtest
     print("This will not be removed")
 
 def remove_me():
     # test
     print("This will not be removed")
+    # endtest
     print("This will be removed")
 
 # test
@@ -361,21 +131,24 @@ class Test:
         def fct(self):
             def do_something2(self):
                 self.x = 1
+# endtest
 """
 
     file_content_version2 = """\
-def do_something(): # test
+# test
+def do_something():
     x = 42
     y = 99
     z = x + y
+# endtest
 
 def remove_me():
-    # test
     print("This will not be removed")
 
 def remove_me():
     # test
     print("This will not be removed")
+    # endtest
 
 # test
 class Test:
@@ -385,6 +158,7 @@ class Test:
                 self.x = 1
                 self.x2 = 42
                 self.y = 99
+# endtest
 """
 
     mock_results = []
@@ -422,12 +196,12 @@ class Test:
         ]
         monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: self.git_show_mock())
 
-        res = get_doc_tracked_differences(None, None, None, ["# test", "#test"])
+        res = get_doc_tracked_differences(None, None, None, [("# test", "# endtest")])
 
         assert res == {
             "bar.py": set([
-                GitDifference(from_rm_line=1, to_rm_line=2, from_add_line=1, to_add_line=3),
-                GitDifference(from_rm_line=6, to_rm_line=6, from_add_line=-1, to_add_line=-1),
-                GitDifference(from_rm_line=-1, to_rm_line=-1, from_add_line=19, to_add_line=20),
+                GitDifference(from_rm_line=2, to_rm_line=3, from_add_line=2, to_add_line=4),
+                GitDifference(from_rm_line=7, to_rm_line=9, from_add_line=-1, to_add_line=-1),
+                GitDifference(from_rm_line=-1, to_rm_line=-1, from_add_line=21, to_add_line=22),
             ])
         }

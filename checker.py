@@ -1,22 +1,7 @@
 from dataclasses import dataclass
-from tree_sitter import Parser
 
-import tree_sitter_python as tspython
 import subprocess
 import re
-from tree_sitter import Language, Parser, Node, Point
-
-PY_LANGUAGE = Language(tspython.language())
-MAX_U_LONG = 1 << 64
-MAX_LINE_SIZE = MAX_U_LONG # Big value, not supposed to be overflown
-
-@dataclass
-class CodeNode:
-    type: str = ""
-    name: str = ""
-    from_line: int = 0
-    to_line: int = 0
-
 
 @dataclass(frozen=True)
 class GitDifference:
@@ -29,96 +14,6 @@ class GitDifference:
 class Difference:
     from_line: int = -1
     to_line: int = -1
-
-def find_first_comment(node: Node):
-    if node.type == 'comment':
-        return node
-    for child in node.children:
-        result = find_first_comment(child)
-        if result:
-            return result
-    return None
-
-def line_is_comment(line: str, language: str = "python"):
-    parser = Parser(PY_LANGUAGE)
-
-    tree = parser.parse(bytes(line, 'utf8'))
-    root = tree.root_node
-
-    children = root.children
-
-    return len(children) == 1 and children[0].type == "comment"
-
-def line_is_tag(line: str, tags: list[str], language: str = "python"):
-    parser = Parser(PY_LANGUAGE)
-
-    tree = parser.parse(bytes(line, 'utf8'))
-    root = tree.root_node
-
-    children = root.children
-
-    if len(children) == 1 and children[0].type == "comment":
-        for tag in tags:
-            if tag in line[children[0].start_byte:children[0].end_byte]:
-                return True
-    return False
-
-def line_is_tagged(line: str, tags: list[str], language: str = "python"):
-    parser = Parser(PY_LANGUAGE)
-
-    tree = parser.parse(bytes(line, 'utf8'))
-    root = tree.root_node
-
-    comment = find_first_comment(root)
-    if comment is None:
-        return False
-
-    for tag in tags:
-        if tag in line[comment.start_byte:comment.end_byte]:
-            return True
-
-    return False
-
-
-def retrieve_end_point(node: Node, language: str = "python") -> Point | None:
-    """
-    retrieve endpoint of class_definition or funcion_definition
-    """
-    for child in node.children:
-        if child.type == ":":
-            return child.end_point
-    return None
-
-def get_structure_code_nodes(file_content: str, target_line: int, language: str) -> list[CodeNode]:
-    """
-    Retrieve list of CodeNode that represents list of classes / functions where a line is in
-    """
-    parser = Parser(PY_LANGUAGE)
-
-
-    tree = parser.parse(file_content.encode())
-    root = tree.root_node
-
-    row = target_line
-    point = (row, MAX_LINE_SIZE)
-    node = root.named_descendant_for_point_range(point, point)
-
-    contexts = []
-    while node:
-        typ = node.type
-        if language == 'python' and typ in ('function_definition', 'class_definition'):
-            name = node.child_by_field_name('name')
-            contexts.append(CodeNode(type=typ, name=name.text.decode(), from_line=node.start_point[0], to_line=retrieve_end_point(node, language)[0]))
-        elif language == 'javascript' and typ in ('function_declaration', 'method_definition', 'class_declaration'):
-            name = node.child_by_field_name('name')
-            contexts.append(CodeNode(type=typ, name=name.text.decode(), from_line=node.start_point[0], to_line=retrieve_end_point(node, language)[0]))
-        elif language == 'html' and typ == 'element':
-            start_tag = node.child_by_field_name('start_tag') or node.child(0)
-            tagname = start_tag.child_by_field_name('tag_name')
-            contexts.append(CodeNode(type="balise", name=tagname.text.decode(), from_line=node.start_point[0], to_line=node.end_point[0]))
-        node = node.parent
-
-    return contexts[::-1]
 
 def get_git_difference(
     rm_start: int,
@@ -192,42 +87,38 @@ def get_git_differences(
     output = result.stdout
     return parse_differences(output)
 
-def get_last_comment_line_before_index(lines: list[str], ind: int, language: str = "python"):
-    i = ind - 1
-    while i > -1 and line_is_comment(lines[i], language) or lines[i].strip() == "":
-        i -= 1
-    return i + 1
-
-def content_difference_is_tagged(
+def get_differences_tagged(
     content: str,
-    difference: Difference,
-    tags: list[str],
-    language: str = "python",
-):
+    differences: list[Difference],
+    tags: list[tuple[str]],
+) -> list[int]:
+    differences_sort = sorted(differences, key=lambda d: d.from_line)
+    diff_ind = 0
+    while Difference(from_line=-1, to_line=-1) in differences_sort:
+        differences_sort.pop(0)
+
+    tag_stack = []
+    open_tags = [tag[0] for tag in tags]
+    close_tags = [tag[1] for tag in tags]
+
+    res = []
     lines = content.splitlines()
+    i = 0
+    while i <= differences_sort[-1].to_line:
+        line = lines[i].strip()
+        if line in open_tags:
+            tag_stack.append(line)
+        elif line in close_tags:
+            if open_tags.index(tag_stack[-1]) == close_tags.index(line):
+                tag_stack.pop()
 
-    line_before_index = get_last_comment_line_before_index(lines, difference.from_line, language)
-    for i in range(line_before_index, difference.from_line):
-        if line_is_tag(lines[i], tags, language):
-            return True
+        while diff_ind < len(differences_sort) and differences_sort[diff_ind].from_line <= i <= differences_sort[diff_ind].to_line and len(tag_stack):
+            res.append(differences.index(differences_sort[diff_ind]))
+            diff_ind += 1
 
-    # Check if one of the added / removed lines contains doc
-    for i in range(difference.from_line, difference.to_line + 1):
-        if line_is_tagged(lines[i], tags, language):
-            return True
+        i += 1
 
-    code_nodes = get_structure_code_nodes(content, difference.from_line, language)
-    for code_node in code_nodes:
-        line_before_index = get_last_comment_line_before_index(lines, code_node.from_line)
-        for i in range(line_before_index, code_node.from_line):
-            if line_is_tag(lines[i], tags, language):
-                return True
-
-        for i in range(code_node.from_line, code_node.to_line + 1):
-            if line_is_tagged(lines[i], tags, language):
-                return True
-
-    return False
+    return res
 
 def get_file_content(version: str | None, path: str):
     result = ""
@@ -259,9 +150,8 @@ def get_doc_tracked_differences(
     version1: str | None,
     version2: str | None,
     path: str | None,
-    tags: list[str],
-    language: str = "python",
-) -> dict[str, GitDifference]:
+    tags: list[tuple[str]],
+) -> dict[str, set[GitDifference]]:
     result = {}
     git_differences = get_git_differences(version1, version2, path)
     # Retrieve if one of the line contained in git_differences ends with doc-tag
@@ -273,16 +163,15 @@ def get_doc_tracked_differences(
         content_version_1 = get_file_content(version1, file_path)
         content_version_2 = get_file_content(version2, file_path)
 
-        for git_difference in git_differences:
-            difference = Difference(from_line=git_difference.from_rm_line, to_line=git_difference.to_rm_line)
-            if difference.from_line != -1:
-                if content_difference_is_tagged(content_version_1, difference, tags):
-                    result[file_path] = set([*result.get(file_path, set([])), git_difference])
-                    continue
+        rm_differences = [Difference(from_line=git_difference.from_rm_line, to_line=git_difference.to_rm_line) for git_difference in git_differences]
+        add_differences = [Difference(from_line=git_difference.from_add_line, to_line=git_difference.to_add_line) for git_difference in git_differences]
 
-            difference = Difference(from_line=git_difference.from_add_line, to_line=git_difference.to_add_line)
-            if difference.from_line != -1:
-                if content_difference_is_tagged(content_version_2, difference, tags):
-                    result[file_path] = set([*result.get(file_path, set([])), git_difference])
+        rm_differences_ind = get_differences_tagged(content_version_1, rm_differences, tags)
+        add_differences_ind = get_differences_tagged(content_version_2, add_differences, tags)
+
+        all_differences_ind = set([*add_differences_ind, *rm_differences_ind])
+
+        if len(all_differences_ind):
+            result[file_path] = set([git_differences[i] for i in all_differences_ind])
 
     return result
