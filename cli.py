@@ -14,11 +14,14 @@ def cli_args():
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    config_parser = subparsers.add_parser("config", help="Vérifie les modifications")
+    config_parser = subparsers.add_parser("config", help="Configuration")
     config_parser.add_argument("--add-git-message", choices=["yes", "no"], help="Add automatic message to git commit / merge requests")
 
-    check_parser = subparsers.add_parser("check", help="Vérifie les modifications")
-    check_parser.add_argument("diff_args", nargs=argparse.REMAINDER, help="Versions Git et path (comme: HEAD~1 HEAD -- path/)")
+    check_parser = subparsers.add_parser("check", help="Check changes")
+    check_parser.add_argument("version1", nargs="?", default=None, help="Version of comparison")
+    check_parser.add_argument("version2", nargs="?", default=None, help="Version to cmopare the first to")
+    check_parser.add_argument("splitter", nargs="?", default=None, choices=["--"], help="Versions and path splitter")
+    check_parser.add_argument("path", nargs="?", help="path")
 
     check_parser.add_argument("--fail-status", type=int, help="Return code in case code documented if modified")
     check_parser.add_argument("--lang", type=str, help="Target language (ex: python, vue, javascript)")
