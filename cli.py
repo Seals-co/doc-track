@@ -20,7 +20,7 @@ def cli_args():
     check_parser = subparsers.add_parser("check", help="Check changes")
     check_parser.add_argument("version1", nargs="?", default=None, help="Version of comparison")
     check_parser.add_argument("version2", nargs="?", default=None, help="Version to cmopare the first to")
-    check_parser.add_argument("splitter", nargs="?", default=None, choices=["--"], help="Versions and path splitter")
+    check_parser.add_argument("splitter", nargs="?", default=None, help="Versions and path splitter, value is '--'")
     check_parser.add_argument("path", nargs="?", help="path")
 
     check_parser.add_argument("--fail-status", type=int, help="Return code in case code documented if modified")
@@ -29,9 +29,16 @@ def cli_args():
 
     args = parser.parse_args()
 
+    if args.command == "check":
+        if args.version1 == "--":
+            args.path = args.version2
+            args.splitter = "--"
+        elif args.version2 == "--":
+            args.path = args.splitter
+            args.splitter = "--"
+
     return args
 
 args = cli_args()
-
 fct = COMMANDS[args.command]
 fct(args)
