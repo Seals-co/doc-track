@@ -21,6 +21,28 @@ doc-track is a tool that allows developpers to make CI fail when a piece of code
 
 `--skip-blank-lines` # To skip blank lines changes of documented code, default True
 
+# Config
+You can add a configuration file that must respect the .yml format.
+
+All options listed above are also available in the config file.
+
+Here is an example of a typical usage for a python project's CI/CD:
+
+```yaml
+# .doctrack.yml
+
+version_from: master
+version_to: HEAD
+path: .
+
+tags:
+  - ["# tracked", "# endtracked"]
+
+fail_status: 1
+show_result: True
+skip_blank_lines: True
+```
+
 # Mark code as documented
 
 To mark code as documented, wrap it with both start tag and end tag.
