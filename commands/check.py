@@ -1,5 +1,6 @@
 from checker import get_doc_tracked_differences
 from config import load_config, update_args
+from output import get_result_displayed
 
 def run(args):
     config = load_config(args.config)
@@ -13,5 +14,7 @@ def run(args):
     )
 
     print(res)
+    print(get_result_displayed(res))
     if res != {} and args.fail_status:
         exit(args.fail_status)
+

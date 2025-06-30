@@ -3,12 +3,19 @@ from dataclasses import dataclass
 import subprocess
 import re
 
-@dataclass(frozen=True)
+@dataclass(eq=True, unsafe_hash=True)
 class GitDifference:
+    rm_start: int = -1
+    rm_len: int = -1
+    add_start: int = -1
+    add_len: int = -1
+
     from_rm_line: int = -1
     to_rm_line: int = -1
     from_add_line: int = -1
     to_add_line: int = -1
+
+    text: str = ""
 
 @dataclass(frozen=True)
 class Difference:
@@ -37,6 +44,10 @@ def get_git_difference(
 
 
     return GitDifference(
+        rm_start=rm_start,
+        rm_len=rm_len,
+        add_start=add_start,
+        add_len=add_len,
         from_add_line=from_add_line,
         to_add_line=to_add_line,
         from_rm_line=from_rm_line,
@@ -68,7 +79,8 @@ def parse_differences(output: str) -> dict[str, list[GitDifference]]:
 
                 difference = get_git_difference(rm_start, rm_len, add_start, add_len)
                 differences[current_file].append(difference)
-
+        elif len(differences.get(current_file, [])):
+            differences[current_file][-1].text += line + "\n"
     return differences
 
 def get_git_differences(
@@ -108,7 +120,7 @@ def get_differences_tagged(
     res = []
     lines = content.splitlines()
     i = 0
-    while i <= differences_sort[-1].to_line:
+    while i <= differences_sort[-1].to_line and i < len(lines):
         line = lines[i].strip()
         if line in open_tags:
             tag_stack.append(line)
@@ -122,11 +134,19 @@ def get_differences_tagged(
             res.append(differences.index(differences_sort[diff_ind]))
             diff_ind += 1
 
+        while (
+            diff_ind < len(differences_sort)
+            and differences_sort[diff_ind].to_line < i
+        ):
+            diff_ind += 1
+
         if line in close_tags:
             if len(tag_stack) and open_tags.index(tag_stack[-1]) == close_tags.index(line):
                 tag_stack.pop()
 
         i += 1
+
+
 
     return res
 
