@@ -91,11 +91,15 @@ def get_differences_tagged(
     content: str,
     differences: list[Difference],
     tags: list[tuple[str]],
+    skip_blank_lines: bool = True,
 ) -> list[int]:
     differences_sort = sorted(differences, key=lambda d: d.from_line)
     diff_ind = 0
     while Difference(from_line=-1, to_line=-1) in differences_sort:
         differences_sort.pop(0)
+
+    if not len(differences_sort):
+        return []
 
     tag_stack = []
     open_tags = [tag[0] for tag in tags]
@@ -112,7 +116,12 @@ def get_differences_tagged(
             if open_tags.index(tag_stack[-1]) == close_tags.index(line):
                 tag_stack.pop()
 
-        while diff_ind < len(differences_sort) and differences_sort[diff_ind].from_line <= i <= differences_sort[diff_ind].to_line and len(tag_stack):
+        while (
+            diff_ind < len(differences_sort)
+            and differences_sort[diff_ind].from_line <= i <= differences_sort[diff_ind].to_line
+            and len(tag_stack)
+            and (line != "" or not skip_blank_lines)
+        ):
             res.append(differences.index(differences_sort[diff_ind]))
             diff_ind += 1
 
@@ -147,11 +156,13 @@ def get_file_content(version: str | None, path: str):
     return result
 
 def get_doc_tracked_differences(
-    version1: str | None,
-    version2: str | None,
-    path: str | None,
-    tags: list[tuple[str]],
+    args
 ) -> dict[str, set[GitDifference]]:
+    version1 = args.version_from
+    version2 = args.version_to
+    path = args.path
+    tags = args.tags
+    skip_blank_lines = args.skip_blank_lines
     result = {}
     git_differences = get_git_differences(version1, version2, path)
     # Retrieve if one of the line contained in git_differences ends with doc-tag
@@ -166,8 +177,8 @@ def get_doc_tracked_differences(
         rm_differences = [Difference(from_line=git_difference.from_rm_line, to_line=git_difference.to_rm_line) for git_difference in git_differences]
         add_differences = [Difference(from_line=git_difference.from_add_line, to_line=git_difference.to_add_line) for git_difference in git_differences]
 
-        rm_differences_ind = get_differences_tagged(content_version_1, rm_differences, tags)
-        add_differences_ind = get_differences_tagged(content_version_2, add_differences, tags)
+        rm_differences_ind = get_differences_tagged(content_version_1, rm_differences, tags, skip_blank_lines)
+        add_differences_ind = get_differences_tagged(content_version_2, add_differences, tags, skip_blank_lines)
 
         all_differences_ind = set([*add_differences_ind, *rm_differences_ind])
 
