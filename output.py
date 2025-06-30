@@ -6,9 +6,13 @@ GREEN = "\033[92m"
 CYAN = "\033[96m"
 
 def get_result_displayed(differences: dict[str, set[GitDifference]]):
-    res = ""
-    res += "Differences affected by documentations :\n\n"
+    if not differences:
+        return "No differences affected by documentation found !"
+
+    res = "Differences affected by documentations :\n"
     for file_path, differences in differences.items():
+        res += "\n"
+        res += f"--- a/{file_path}\n"
         res += f"+++ b/{file_path}\n"
         differences = sorted(differences, key=lambda d: d.from_rm_line if d.from_rm_line != -1 else d.from_add_line)
         for diff in differences:
