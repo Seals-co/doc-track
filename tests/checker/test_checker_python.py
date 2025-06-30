@@ -1,17 +1,16 @@
-from collections import namedtuple
+import subprocess
+import typing
+
 import checker
 from checker import (
     Difference,
     GitDifference,
     get_differences_tagged,
+    get_doc_tracked_differences,
     get_git_difference,
     parse_differences,
-    get_doc_tracked_differences,
-
-
 )
 
-import subprocess
 
 def overwrite_git_diff_eq_hash():
     GitDifference.__eq__ = lambda self, obj: (
@@ -28,18 +27,23 @@ def overwrite_git_diff_eq_hash():
         self.to_add_line,
     ))
 
+
 class TestGetDifference:
     def test_get_git_difference(self):
-        assert get_git_difference(10, 2, 10, 3) == GitDifference(from_rm_line=9, to_rm_line=10, from_add_line=9, to_add_line=11)
+        assert (get_git_difference(10, 2, 10, 3)
+            == GitDifference(from_rm_line=9, to_rm_line=10, from_add_line=9, to_add_line=11))
 
     def test_get_git_difference_new_content(self):
-        assert get_git_difference(0, 0, 1, 3) == GitDifference(from_rm_line=-1, to_rm_line=-1, from_add_line=0, to_add_line=2)
+        assert (get_git_difference(0, 0, 1, 3)
+            == GitDifference(from_rm_line=-1, to_rm_line=-1, from_add_line=0, to_add_line=2))
 
     def test_get_git_difference_no_rm(self):
-        assert get_git_difference(5, 0, 6, 2) == GitDifference(from_rm_line=-1, to_rm_line=-1, from_add_line=5, to_add_line=6)
+        assert (get_git_difference(5, 0, 6, 2)
+            == GitDifference(from_rm_line=-1, to_rm_line=-1, from_add_line=5, to_add_line=6))
 
     def test_get_git_difference_no_add(self):
-        assert get_git_difference(25, 1, 27, 0) == GitDifference(from_rm_line=24, to_rm_line=24, from_add_line=-1, to_add_line=-1)
+        assert (get_git_difference(25, 1, 27, 0)
+            == GitDifference(from_rm_line=24, to_rm_line=24, from_add_line=-1, to_add_line=-1))
 
 
 class TestParseDifferences:
@@ -183,7 +187,7 @@ class Test:
     call_counter = {}
     fct_called = ""
 
-    MockCompletedProcess = namedtuple("CompletedProcess", ["stdout", "stderr"])
+    MockCompletedProcess = typing.NamedTuple("CompletedProcess", ["stdout", "stderr"])
 
     def git_show_mock(self):
         self.call_counter.setdefault(self.fct_called, 0)
@@ -196,7 +200,7 @@ class Test:
         self.fct_called = "test_no_differences"
         monkeypatch.setattr(checker, "get_git_differences", lambda version1, version2, path: {})
 
-        res = get_doc_tracked_differences(None, None, None, ["# test", "#test"], True)
+        res = get_doc_tracked_differences(None, None, None, ["# test", "#test"], skip_blank_lines=True)
 
         assert res == {}
 
@@ -215,14 +219,15 @@ class Test:
         ]
         monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: self.git_show_mock())
 
-        res = get_doc_tracked_differences(None, None, None, [("# test", "# endtest")], True)
+        res = get_doc_tracked_differences(None, None, None, [("# test", "# endtest")], skip_blank_lines=True)
 
         assert res == {
-            "bar.py": set([
+            "bar.py": {
                 GitDifference(from_rm_line=7, to_rm_line=9, from_add_line=-1, to_add_line=-1),
                 GitDifference(from_rm_line=-1, to_rm_line=-1, from_add_line=21, to_add_line=22),
-            ])
+            }
         }
+
 
 class TestGetDifferencesTagged:
     def test_get_differences_tagged_rm(self):

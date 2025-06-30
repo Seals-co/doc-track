@@ -1,7 +1,7 @@
+import re
+import subprocess
 from dataclasses import dataclass
 
-import subprocess
-import re
 
 @dataclass(eq=True, unsafe_hash=True)
 class GitDifference:
@@ -12,10 +12,12 @@ class GitDifference:
 
     text: str = ""
 
+
 @dataclass(frozen=True)
 class Difference:
     from_line: int = -1
     to_line: int = -1
+
 
 def get_git_difference(
     rm_start: int,
@@ -37,9 +39,7 @@ def get_git_difference(
         from_rm_line = -1
         to_rm_line = -1
 
-
     return GitDifference(
-
         from_add_line=from_add_line,
         to_add_line=to_add_line,
         from_rm_line=from_rm_line,
@@ -76,6 +76,7 @@ def parse_differences(output: str) -> dict[str, list[GitDifference]]:
             differences[current_file][-1].text += line + "\n"
     return differences
 
+
 def get_git_differences(
     version1: str | None,
     version2: str | None,
@@ -88,9 +89,10 @@ def get_git_differences(
 
     args = [a for a in (version1, version2, "--", path) if a]
 
-    result = subprocess.run(['git', 'diff', '--unified=0', *args], capture_output=True, text=True)
+    result = subprocess.run(['git', 'diff', '--unified=0', *args], capture_output=True, text=True)  # noqa S603 Input variables are safe
     output = result.stdout
     return parse_differences(output)
+
 
 def get_differences_tagged(
     content: str,
@@ -133,32 +135,30 @@ def get_differences_tagged(
         ):
             diff_ind += 1
 
-        if line in close_tags:
-            if len(tag_stack) and open_tags.index(tag_stack[-1]) == close_tags.index(line):
-                tag_stack.pop()
+        if line in close_tags and len(tag_stack) and open_tags.index(tag_stack[-1]) == close_tags.index(line):
+            tag_stack.pop()
 
         i += 1
 
     return res
 
+
 def get_file_content(version: str | None, path: str):
     result = ""
 
     if version:
-        show_result = subprocess.run(
-            ["git", "show", f"{version}:{path}"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+        show_result = subprocess.run( # noqa S603 Input variables are safe
+            ["/usr/bin/git", "show", f"{version}:{path}"],
+            capture_output=True,
             check=True,
             text=True
         )
 
         result = show_result.stdout
     else:
-        cat_result = subprocess.run(
-            ["cat", f"{path}"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+        cat_result = subprocess.run( # noqa S603 Input variables are safe
+            ["/usr/bin/cat", f"{path}"],
+            capture_output=True,
             check=True,
             text=True
         )
@@ -166,6 +166,7 @@ def get_file_content(version: str | None, path: str):
         result = cat_result.stdout
 
     return result
+
 
 def get_doc_tracked_differences(
     version_from: str | None,
@@ -176,9 +177,7 @@ def get_doc_tracked_differences(
 ) -> dict[str, set[GitDifference]]:
     version1 = version_from or "HEAD"
     version2 = version_to
-    path = path
-    tags = tags
-    skip_blank_lines = skip_blank_lines
+
     result = {}
     git_differences = get_git_differences(version1, version2, path)
     # Retrieve if one of the line contained in git_differences ends with doc-tag
@@ -186,19 +185,21 @@ def get_doc_tracked_differences(
 
     version1 = version1 or ""
     version2 = version2 or ""
-    for file_path, git_differences in git_differences.items():
+    for file_path, git_diffs in git_differences.items():
         content_version_1 = get_file_content(version1, file_path)
         content_version_2 = get_file_content(version2, file_path)
 
-        rm_differences = [Difference(from_line=git_difference.from_rm_line, to_line=git_difference.to_rm_line) for git_difference in git_differences]
-        add_differences = [Difference(from_line=git_difference.from_add_line, to_line=git_difference.to_add_line) for git_difference in git_differences]
+        rm_differences = [Difference(from_line=git_difference.from_rm_line, to_line=git_difference.to_rm_line)
+                            for git_difference in git_diffs]
+        add_differences = [Difference(from_line=git_difference.from_add_line, to_line=git_difference.to_add_line)
+                            for git_difference in git_diffs]
 
         rm_differences_ind = get_differences_tagged(content_version_1, rm_differences, tags, skip_blank_lines)
         add_differences_ind = get_differences_tagged(content_version_2, add_differences, tags, skip_blank_lines)
 
-        all_differences_ind = set([*add_differences_ind, *rm_differences_ind])
+        all_differences_ind = {*add_differences_ind, *rm_differences_ind}
 
         if len(all_differences_ind):
-            result[file_path] = set([git_differences[i] for i in all_differences_ind])
+            result[file_path] = {git_diffs[i] for i in all_differences_ind}
 
     return result
