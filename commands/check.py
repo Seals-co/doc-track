@@ -13,7 +13,6 @@ def run(args):
         args.skip_blank_lines,
     )
 
-    print(res)
     print(get_result_displayed(res))
     if res != {} and args.fail_status:
         exit(args.fail_status)

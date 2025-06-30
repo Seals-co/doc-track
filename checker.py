@@ -5,11 +5,6 @@ import re
 
 @dataclass(eq=True, unsafe_hash=True)
 class GitDifference:
-    rm_start: int = -1
-    rm_len: int = -1
-    add_start: int = -1
-    add_len: int = -1
-
     from_rm_line: int = -1
     to_rm_line: int = -1
     from_add_line: int = -1
@@ -44,10 +39,7 @@ def get_git_difference(
 
 
     return GitDifference(
-        rm_start=rm_start,
-        rm_len=rm_len,
-        add_start=add_start,
-        add_len=add_len,
+
         from_add_line=from_add_line,
         to_add_line=to_add_line,
         from_rm_line=from_rm_line,
@@ -78,6 +70,7 @@ def parse_differences(output: str) -> dict[str, list[GitDifference]]:
                 add_len = int(match.group(4) or 1)
 
                 difference = get_git_difference(rm_start, rm_len, add_start, add_len)
+                difference.text += line + "\n"
                 differences[current_file].append(difference)
         elif len(differences.get(current_file, [])):
             differences[current_file][-1].text += line + "\n"
@@ -183,7 +176,7 @@ def get_doc_tracked_differences(
     tags: list[tuple[str]],
     skip_blank_lines: bool,
 ) -> dict[str, set[GitDifference]]:
-    version1 = version_from
+    version1 = version_from or "HEAD"
     version2 = version_to
     path = path
     tags = tags
