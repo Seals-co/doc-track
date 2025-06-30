@@ -139,8 +139,6 @@ def get_differences_tagged(
 
         i += 1
 
-
-
     return res
 
 def get_file_content(version: str | None, path: str):

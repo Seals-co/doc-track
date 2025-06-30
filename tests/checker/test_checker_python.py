@@ -13,6 +13,21 @@ from checker import (
 
 import subprocess
 
+def overwrite_git_diff_eq_hash():
+    GitDifference.__eq__ = lambda self, obj: (
+        self.from_rm_line == obj.from_rm_line
+        and self.to_rm_line == obj.to_rm_line
+        and self.from_add_line == obj.from_add_line
+        and self.to_add_line == obj.to_add_line
+    )
+
+    GitDifference.__hash__ = lambda self: hash((
+        self.from_rm_line,
+        self.to_rm_line,
+        self.from_add_line,
+        self.to_add_line,
+    ))
+
 class TestGetDifference:
     def test_get_git_difference(self):
         assert get_git_difference(10, 2, 10, 3) == GitDifference(from_rm_line=9, to_rm_line=10, from_add_line=9, to_add_line=11)
@@ -68,6 +83,7 @@ index 1234567..89abcde 100644
 +    print("Was empty")
 +    return True
 """
+        overwrite_git_diff_eq_hash()
         res = parse_differences(output)
 
         assert res == {
@@ -180,7 +196,7 @@ class Test:
         self.fct_called = "test_no_differences"
         monkeypatch.setattr(checker, "get_git_differences", lambda version1, version2, path: {})
 
-        res = get_doc_tracked_differences(None, None, None, ["# test", "#test"])
+        res = get_doc_tracked_differences(None, None, None, ["# test", "#test"], True)
 
         assert res == {}
 
@@ -189,6 +205,7 @@ class Test:
         going to return 3 differences because they are in a tagged scope
         but not the difference of -13 +12,0 because it's not tagged
         """
+        overwrite_git_diff_eq_hash()
         self.fct_called = "test_some_differences"
 
         self.mock_results = [
@@ -198,7 +215,7 @@ class Test:
         ]
         monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: self.git_show_mock())
 
-        res = get_doc_tracked_differences(None, None, None, [("# test", "# endtest")])
+        res = get_doc_tracked_differences(None, None, None, [("# test", "# endtest")], True)
 
         assert res == {
             "bar.py": set([
