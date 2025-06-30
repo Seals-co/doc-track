@@ -1,16 +1,36 @@
 # doc-track
 
-doc-track is a tool that allows developpers to make CI fail or add message to commit / merge requests when a piece of code marked as "is documented" is added / modified / deleted.
+doc-track is a tool that allows developpers to make CI fail when a piece of code marked as "is documented" is added / modified / deleted.
+
+# Installation
+
 # options available
---lang              # to configure language used, will automatically set tags
+`--version-from` # Git version of comparison used
 
---add-git-message   # to add message to git commits and merge request
+`--version-to` # Git version to compare the first version to
 
---fail-status       # to set $? to the specified value when fail
+`--path` # Path where comparison is checked
 
-# args list:
+`--tags` # Pair list of start / end tag: `... --tags "# start","# end" "#start","#end"...`
 
-[<commit>]...[<commit>] [--] [<path>...]
+`--config` # to specify config file, default .doctrack.yml
 
-# tagging a line
-tagging a line to flag it has documented comment in the same line with flag word
+`--fail-status` # Return code in case code documented is modified, default 0
+
+`--show-result` # To enable showing result in error output, default True
+
+`--skip-blank-lines` # To skip blank lines changes of documented code, default True
+
+# Mark code as documented
+
+To mark code as documented, wrap it with both start tag and end tag.
+
+Tag must be the only text on the line:
+```python
+class A:
+    # documented
+    def fct():
+        return 22
+    # end-documented
+```
+End tag must be different from start tag

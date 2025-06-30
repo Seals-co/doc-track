@@ -36,7 +36,7 @@ def cli_args():
 
 
     check_parser.add_argument("--config", help="Path to config file", default=".doctrack.yml")
-    check_parser.add_argument("--fail-status", type=int, help="Return code in case code documented if modified")
+    check_parser.add_argument("--fail-status", type=int, help="Return code in case code documented is modified")
     check_parser.add_argument("--show-result", type=str_to_bool, help="Show output of result in standard output", default=True)
     check_parser.add_argument("--skip-blank-lines", type=str_to_bool, help="Skip blank lines changes", default=True)
 
