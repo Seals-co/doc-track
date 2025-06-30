@@ -123,7 +123,7 @@ def get_differences_tagged(
             diff_ind += 1
 
         if line in close_tags:
-            if open_tags.index(tag_stack[-1]) == close_tags.index(line):
+            if len(tag_stack) and open_tags.index(tag_stack[-1]) == close_tags.index(line):
                 tag_stack.pop()
 
         i += 1
