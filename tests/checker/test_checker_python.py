@@ -1,7 +1,9 @@
 from collections import namedtuple
 import checker
 from checker import (
+    Difference,
     GitDifference,
+    get_differences_tagged,
     get_git_difference,
     parse_differences,
     get_doc_tracked_differences,
@@ -205,3 +207,81 @@ class Test:
                 GitDifference(from_rm_line=-1, to_rm_line=-1, from_add_line=21, to_add_line=22),
             ])
         }
+
+class TestGetDifferencesTagged:
+    def test_get_differences_tagged_rm(self):
+        file_content = """\
+# test
+def do_something():
+    x = 1
+    y = 2
+# endtest
+
+def remove_me():
+    # test
+    print("This will be removed")
+    # endtest
+    print("This will not be removed")
+
+def remove_me():
+    # test
+    print("This will not be removed")
+    # endtest
+    print("This will be removed")
+
+# test
+class Test:
+    class Test2:
+        def fct(self):
+            def do_something2(self):
+                self.x = 1
+# endtest
+"""
+        tags = [("# test", "# endtest")]
+        differences = [
+            Difference(from_line=16, to_line=16),
+            Difference(from_line=2, to_line=3),
+            Difference(from_line=7, to_line=9),
+            Difference(from_line=-1, to_line=-1),
+        ]
+        res = get_differences_tagged(file_content, differences, tags)
+
+        assert res == [1, 2]
+
+    def test_get_differences_tagged_add(self):
+        file_content = """\
+# test
+def do_something():
+    x = 42
+    y = 99
+    z = x + y
+# endtest
+
+def remove_me():
+    print("This will not be removed")
+
+def remove_me():
+    # test
+    print("This will not be removed")
+    # endtest
+
+# test
+class Test:
+    class Test2:
+        def fct(self):
+            def do_something2(self):
+                self.x = 1
+                self.x2 = 42
+                self.y = 99
+# endtest
+"""
+        tags = [("# test", "# endtest")]
+        differences = [
+            Difference(from_line=-1, to_line=-1),
+            Difference(from_line=21, to_line=22),
+            Difference(from_line=-1, to_line=-1),
+            Difference(from_line=2, to_line=4),
+        ]
+        res = get_differences_tagged(file_content, differences, tags)
+
+        assert res == [3, 1]
