@@ -14,6 +14,14 @@ def parse_tags(tags_str: str):
         raise argparse.ArgumentTypeError(f"Each element must be a pair 'a,b'. Bad format : {tags_str}")
     return tuple(parts)
 
+def str_to_bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    elif v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    raise argparse.ArgumentTypeError("Boolean value expected (true/false)")
 
 def cli_args():
     parser = argparse.ArgumentParser(prog="doc-track")
@@ -29,8 +37,8 @@ def cli_args():
 
     check_parser.add_argument("--config", help="Path to config file", default=".doctrack.yml")
     check_parser.add_argument("--fail-status", type=int, help="Return code in case code documented if modified")
-    check_parser.add_argument("--show-result", type=bool, help="Show output of result in standard output", default=True)
-    check_parser.add_argument("--skip-blank-lines", type=bool, help="Skip blank lines changes", default=True)
+    check_parser.add_argument("--show-result", type=str_to_bool, help="Show output of result in standard output", default=True)
+    check_parser.add_argument("--skip-blank-lines", type=str_to_bool, help="Skip blank lines changes", default=True)
 
     args = parser.parse_args()
 

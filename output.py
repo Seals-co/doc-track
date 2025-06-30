@@ -26,5 +26,4 @@ def get_result_displayed(differences: dict[str, set[GitDifference]]):
                     res += f"{GREEN}{line}{RESET}\n"
                 else:
                     res += f"{line}\n"
-
     return res
