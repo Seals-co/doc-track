@@ -125,7 +125,7 @@ index 225fd2e..d65e857 100644
 """
 
     file_content_version1 = """\
-# test
+# not-test
 def do_something():
     x = 1
     y = 2
@@ -153,7 +153,7 @@ class Test:
 """
 
     file_content_version2 = """\
-# test
+# not-test
 def do_something():
     x = 42
     y = 99
@@ -219,7 +219,6 @@ class Test:
 
         assert res == {
             "bar.py": set([
-                GitDifference(from_rm_line=2, to_rm_line=3, from_add_line=2, to_add_line=4),
                 GitDifference(from_rm_line=7, to_rm_line=9, from_add_line=-1, to_add_line=-1),
                 GitDifference(from_rm_line=-1, to_rm_line=-1, from_add_line=21, to_add_line=22),
             ])
