@@ -157,13 +157,17 @@ def get_file_content(version: str | None, path: str):
     return result
 
 def get_doc_tracked_differences(
-    args
+    version_from: str | None,
+    version_to: str | None,
+    path: str | None,
+    tags: list[tuple[str]],
+    skip_blank_lines: bool,
 ) -> dict[str, set[GitDifference]]:
-    version1 = args.version_from
-    version2 = args.version_to
-    path = args.path
-    tags = args.tags
-    skip_blank_lines = args.skip_blank_lines
+    version1 = version_from
+    version2 = version_to
+    path = path
+    tags = tags
+    skip_blank_lines = skip_blank_lines
     result = {}
     git_differences = get_git_differences(version1, version2, path)
     # Retrieve if one of the line contained in git_differences ends with doc-tag
