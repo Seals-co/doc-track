@@ -112,9 +112,6 @@ def get_differences_tagged(
         line = lines[i].strip()
         if line in open_tags:
             tag_stack.append(line)
-        elif line in close_tags:
-            if open_tags.index(tag_stack[-1]) == close_tags.index(line):
-                tag_stack.pop()
 
         while (
             diff_ind < len(differences_sort)
@@ -124,6 +121,10 @@ def get_differences_tagged(
         ):
             res.append(differences.index(differences_sort[diff_ind]))
             diff_ind += 1
+
+        if line in close_tags:
+            if open_tags.index(tag_stack[-1]) == close_tags.index(line):
+                tag_stack.pop()
 
         i += 1
 
