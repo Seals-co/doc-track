@@ -1,8 +1,8 @@
 import subprocess
 import typing
 
-import checker
-from checker import (
+import doctrack.checker
+from doctrack.checker import (
     Difference,
     GitDifference,
     get_differences_tagged,
@@ -198,7 +198,7 @@ class Test:
 
     def test_no_differences(self, monkeypatch):
         self.fct_called = "test_no_differences"
-        monkeypatch.setattr(checker, "get_git_differences", lambda version1, version2, path: {})
+        monkeypatch.setattr(doctrack.checker, "get_git_differences", lambda version1, version2, path: {})
 
         res = get_doc_tracked_differences(None, None, None, ["# test", "#test"], skip_blank_lines=True)
 
