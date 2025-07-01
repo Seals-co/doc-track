@@ -187,7 +187,7 @@ class Test:
     call_counter = {}
     fct_called = ""
 
-    MockCompletedProcess = typing.NamedTuple("CompletedProcess", ["stdout", "stderr"])
+    MockCompletedProcess = typing.NamedTuple("CompletedProcess", [("stdout", str), ("stderr", str)])
 
     def git_show_mock(self):
         self.call_counter.setdefault(self.fct_called, 0)
