@@ -36,7 +36,7 @@ version_to: HEAD
 path: .
 
 tags:
-  - ["# tracked", "# endtracked"]
+  - ["# doc", "# enddoc"]
 
 fail_status: 1
 show_result: True
@@ -50,9 +50,14 @@ To mark code as documented, wrap it with both start tag and end tag.
 Tag must be the only text on the line:
 ```python
 class A:
-    # documented
+    # doc
     def fct():
         return 22
-    # end-documented
+    # enddoc
 ```
 End tag must be different from start tag
+
+
+# Warning
+Do not allow user you do not trust to execute this code.
+Since subprocesses are run it could lead to security breach.

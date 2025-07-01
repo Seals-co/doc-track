@@ -10,6 +10,5 @@ select = ["E", "F", "W", "I", "N", "UP", "ASYNC", "S", "BLE", "FBT003", "B", "A"
 # S404 : disables insecure models such as subprocess
 # B904 : use raise ... from err
 # RUF012 : wants to specify typing.ClassVar. Like permission_classes: typing.ClassVar
-# T201 : disables prints
 
 ignore = ["S101","S404","B904","RUF012"]

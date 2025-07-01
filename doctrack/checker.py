@@ -1,5 +1,6 @@
 import re
 import subprocess
+import sys
 from dataclasses import dataclass
 
 
@@ -91,6 +92,9 @@ def get_git_differences(
 
     result = subprocess.run(['git', 'diff', '--unified=0', *args], capture_output=True, text=True)  # noqa S603 Input variables are safe
     output = result.stdout
+    if result.stderr:
+        print(result.stderr, file=sys.stderr, end="") # noqa T201 print authorized
+        exit(result.returncode)
     return parse_differences(output)
 
 
@@ -106,6 +110,9 @@ def get_differences_tagged(
         differences_sort.pop(0)
 
     if not len(differences_sort):
+        return []
+
+    if not tags:
         return []
 
     tag_stack = []
@@ -155,6 +162,9 @@ def get_file_content(version: str | None, path: str):
         )
 
         result = show_result.stdout
+        if show_result.stderr:
+            print(show_result.stderr, file=sys.stderr, end="") # noqa T201 print authorized
+            exit(show_result.returncode)
     else:
         cat_result = subprocess.run( # noqa S603 Input variables are safe
             ["/usr/bin/cat", f"{path}"],
@@ -164,6 +174,9 @@ def get_file_content(version: str | None, path: str):
         )
 
         result = cat_result.stdout
+        if cat_result.stderr:
+            print(cat_result.stderr, file=sys.stderr, end="") # noqa T201 print authorized
+            exit(cat_result.returncode)
 
     return result
 

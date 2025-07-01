@@ -10,7 +10,7 @@ def parse_requirements(filename):
 
 setup(
     name="doc-track",
-    version="0.1",
+    version="0.1.0",
     packages=find_packages(),
     install_requires=parse_requirements("requirements.txt"),
     entry_points={
