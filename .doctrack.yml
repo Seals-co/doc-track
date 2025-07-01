@@ -1,10 +1,10 @@
 tags:
-  - ["# test", "# endtest"]
+  - ["# doc", "# enddoc"]
 
 skip_blank_lines: True
 fail_status: 1
 version_from: HEAD
-version_to: master
+version_to: main
 path: .
 
 add_git_message: true

@@ -1,4 +1,4 @@
-from checker import GitDifference
+from doctrack.checker import GitDifference
 
 RESET = "\033[0m"
 RED = "\033[91m"

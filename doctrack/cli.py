@@ -1,6 +1,6 @@
 import argparse
 
-from commands import (
+from doctrack.commands import (
     check,
 )
 
@@ -45,6 +45,11 @@ def cli_args():
     return parser.parse_args()
 
 
-args = cli_args()
-fct = COMMANDS[args.command]
-fct(args)
+def main():
+    args = cli_args()
+    fct = COMMANDS[args.command]
+    fct(args)
+
+
+if __name__ == "__main__":
+    main()
