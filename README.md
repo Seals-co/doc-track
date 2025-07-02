@@ -3,6 +3,14 @@
 doc-track is a tool that allows developpers to make CI fail when a piece of code marked as "is documented" is added / modified / deleted.
 
 # Installation
+```bash
+pip install doc-track
+```
+
+# Usage
+```bash
+doc-track check
+```
 
 # options available
 `--version-from` # Git version of comparison used
