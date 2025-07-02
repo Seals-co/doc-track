@@ -1,0 +1,14 @@
+[tool.ruff]
+preview = true
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "ASYNC", "S", "BLE", "FBT003", "B", "A", "C4", "T10", "ISC", "ICN",
+ "INP", "PIE", "T20", "PYI", "PT", "Q003", "Q004", "RSE", "RET", "SLF", "SIM", "TID252", "ERA", "FLY", "RUF"]
+
+# S101 : disables assert usage
+# S404 : disables insecure models such as subprocess
+# B904 : use raise ... from err
+# RUF012 : wants to specify typing.ClassVar. Like permission_classes: typing.ClassVar
+
+ignore = ["S101","S404","B904","RUF012"]
