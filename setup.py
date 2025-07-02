@@ -10,12 +10,12 @@ def parse_requirements(filename):
 
 setup(
     name="doc-track",
-    version="0.1.0",
+    version="0.1.1",
     packages=find_packages(),
     install_requires=parse_requirements("requirements.txt"),
     entry_points={
         "console_scripts": [
-            "doctrack = doctrack.cli:main",
+            "doc-track = doctrack.cli:main",
         ],
     },
     python_requires=">=3.7",
