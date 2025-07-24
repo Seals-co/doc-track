@@ -7,4 +7,4 @@ version_from: HEAD
 version_to: main
 path: .
 
-add_git_message: true
+show_result: true
