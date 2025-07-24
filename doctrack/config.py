@@ -22,4 +22,13 @@ def update_args(args, config: dict):
         if getattr(args, key) is None:
             setattr(args, key, value)
 
+    if args.show_result is None:
+        args.show_result = True
+
+    if args.skip_blank_lines is None:
+        args.skip_blank_lines = True
+
+    if args.version_from is None:
+        args.version_from = "HEAD"
+
     return args
