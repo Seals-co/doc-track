@@ -4,7 +4,7 @@ tags:
 skip_blank_lines: True
 fail_status: 1
 version_from: HEAD
-version_to: main
+version_to: origin/main
 path: .
 
 show_result: true
