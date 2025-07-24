@@ -39,7 +39,7 @@ Here is an example of a typical usage for a python project's CI/CD:
 ```yaml
 # .doctrack.yml
 
-version_from: master
+version_from: origin/master
 version_to: HEAD
 path: .
 
@@ -65,6 +65,22 @@ class A:
 ```
 End tag must be different from start tag
 
+# Recurring Issues
+When using in CI, does not always have all the git environment.
+
+For github do:
+```
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0
+```
+For gitlab do:
+```
+variables:
+  GIT_DEPTH: "0"
+```
+
+And replace `version_to` `master` (or `main`) in `.doctrackyml` by `origin/master` (or `origin/main`)
 
 # Warning
 Do not allow user you do not trust to execute this code.
