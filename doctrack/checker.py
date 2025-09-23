@@ -150,10 +150,22 @@ def get_differences_tagged(
     return res
 
 
+def get_file_exists(version: str, path: str) -> bool:
+    result = subprocess.run(  # noqa: S603 Input variables are safe
+        ["/usr/bin/git", "ls-tree", "-r", "--name-only", version, "--", path],
+        capture_output=True,
+        text=True
+    )
+    return result.returncode == 0 and bool(result.stdout.strip())
+
+
 def get_file_content(version: str | None, path: str):
     result = ""
 
     if version:
+        if not get_file_exists(version, path):
+            return ""
+
         show_result = subprocess.run( # noqa S603 Input variables are safe
             ["/usr/bin/git", "show", f"{version}:{path}"],
             capture_output=True,

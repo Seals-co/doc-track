@@ -187,12 +187,15 @@ class Test:
     call_counter = {}
     fct_called = ""
 
-    MockCompletedProcess = typing.NamedTuple("CompletedProcess", [("stdout", str), ("stderr", str)])  # noqa: UP014
+    MockCompletedProcess = typing.NamedTuple(  # noqa: UP014
+        "CompletedProcess", [("stdout", str), ("stderr", str), ("returncode", int)]
+    )
 
-    def git_show_mock(self):
+    def subprocess_mock(self):
         self.call_counter.setdefault(self.fct_called, 0)
 
-        res = self.MockCompletedProcess(stdout=self.mock_results[self.call_counter[self.fct_called]], stderr="")
+        res = self.MockCompletedProcess(
+            stdout=self.mock_results[self.call_counter[self.fct_called]], stderr="", returncode=0)
         self.call_counter[self.fct_called] += 1
         return res
 
@@ -214,10 +217,11 @@ class Test:
 
         self.mock_results = [
             self.diff_content,
+            "file_name",                    # Mock git ls-tree to indicate file is exists in git history
             self.file_content_version1,
             self.file_content_version2,
         ]
-        monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: self.git_show_mock())
+        monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: self.subprocess_mock())
 
         res = get_doc_tracked_differences(None, None, None, [("# test", "# endtest")], skip_blank_lines=True)
 
